@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Muse AI 社群客服与用户洞察</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell insight-home">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Muse AI</p>
+            <h1>AI 社群客服与用户洞察</h1>
+          </div>
+          <div class="topbar-actions">
+            <div class="status-pill" id="pendingCount">待总结 0 条</div>
+            <a class="panel-link button-link" href="/panel">深度分析</a>
+          </div>
+        </header>
+
+        <section class="stat-bar home-stat-bar">
+          <div class="stat-tile"><small>今日消息</small><strong id="statTodayMessages">–</strong></div>
+          <div class="stat-tile"><small>7 天消息</small><strong id="statWeekMessages">–</strong></div>
+          <div class="stat-tile"><small>活跃用户</small><strong id="statWeekUsers">–</strong></div>
+          <div class="stat-tile"><small>待确认事件</small><strong id="statPendingConfirm">–</strong></div>
+        </section>
+
+        <section class="summary-panel ai-command-panel">
+          <div class="section-head">
+            <div>
+              <h2>AI 总结</h2>
+              <p>采集群聊、限定分析范围，并生成可推送给运营和客服的汇总。</p>
+            </div>
+            <div class="summary-actions">
+              <button id="runSummary">立即总结</button>
+            </div>
+          </div>
+
+          <div class="command-grid">
+            <section class="command-block">
+              <div class="block-head">
+                <div>
+                  <h3>群聊采集</h3>
+                  <p id="autoStatus">–</p>
+                </div>
+                <button type="button" class="secondary" id="importNow">立即采集</button>
+              </div>
+              <label class="field-inline">
+                自动采集并分类
+                <select id="autoInterval">
+                  <option value="0">关闭（手动）</option>
+                  <option value="30">每半小时</option>
+                  <option value="60">每 1 小时</option>
+                  <option value="120">每 2 小时</option>
+                  <option value="1440">每天</option>
+                </select>
+              </label>
+            </section>
+
+            <section class="command-block">
+              <div class="block-head">
+                <div>
+                  <h3>选择群聊</h3>
+                  <p id="groupStatus">未加载群聊。</p>
+                </div>
+                <div class="mini-actions">
+                  <button type="button" class="secondary" id="syncGroups">同步</button>
+                  <button type="button" id="saveGroups">保存</button>
+                </div>
+              </div>
+              <div id="groupList" class="summary-group-list"></div>
+            </section>
+          </div>
+
+          <div class="summary-toolbar">
+            <label class="checkbox">
+              <input type="checkbox" id="sendWechat" />
+              推送到企业微信群
+            </label>
+            <label class="limit-control">
+              最近
+              <input id="summaryLimit" type="number" min="1" max="500" step="1" value="100" />
+              条
+            </label>
+            <button class="secondary" id="rerunSummary">按范围重算</button>
+          </div>
+          <div id="summaryOutput" class="summary-output markdown-body">还没有生成总结。</div>
+        </section>
+
+        <section class="chat-panel">
+          <div class="section-head">
+            <div>
+              <h2>AI 问答</h2>
+              <p>基于群聊消息、事件、需求、总结与报告回答，支持溯源到群/人/原文。</p>
+            </div>
+            <button type="button" class="secondary" id="clearChat">清空对话</button>
+          </div>
+          <div id="chatMessages" class="chat-messages" aria-live="polite">
+            <div class="chat-empty muted">
+              向 AI 提问，例如：边骑车边写歌、骑车直播放歌
+              这是从哪个群哪个人得到的消息，给我群编号和原消息。
+            </div>
+          </div>
+          <form id="chatForm" class="chat-input-row" autocomplete="off">
+            <textarea id="chatInput" rows="1" placeholder="用中文提问…"></textarea>
+            <button type="submit" id="chatSend">发送</button>
+          </form>
+        </section>
+
+      </section>
+
+      <aside class="side-panel">
+        <div class="section-head compact">
+          <h2>历史 AI 总结</h2>
+          <button class="icon-button" id="refreshList" aria-label="刷新">刷新</button>
+        </div>
+        <div class="date-filter">
+          <label>从<input type="date" id="summaryDateStart" /></label>
+          <label>到<input type="date" id="summaryDateEnd" /></label>
+          <button type="button" class="secondary clear-date" id="clearDateFilter">清除</button>
+        </div>
+        <div id="summaryHistory" class="summary-history"></div>
+      </aside>
+
+      <aside class="side-panel">
+        <div class="section-head compact history-head">
+          <div>
+            <h2>每周运营报告</h2>
+            <p>按客户要求沉淀 14 节固定结构。</p>
+          </div>
+          <button type="button" class="secondary" id="refreshWeekly">刷新</button>
+        </div>
+        <div class="date-filter">
+          <label>从<input type="date" id="weeklyDateStart" /></label>
+          <label>到<input type="date" id="weeklyDateEnd" /></label>
+          <button type="button" class="secondary clear-date" id="clearWeeklyDate">清除</button>
+        </div>
+        <div id="weeklyList" class="summary-history"></div>
+      </aside>
+    </main>
+
+    <script src="/public/markdown.js"></script>
+    <script src="/public/app.js"></script>
+  </body>
+</html>

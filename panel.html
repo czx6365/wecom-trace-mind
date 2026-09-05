@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Muse AI 深度分析面板</title>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <main class="panel-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Muse AI</p>
+          <h1>深度分析面板</h1>
+        </div>
+        <div class="panel-head-actions">
+          <a class="panel-link button-link" href="/">返回 AI 总结</a>
+        </div>
+      </header>
+
+      <section class="stat-bar" id="statBar">
+        <div class="stat-tile"><small>今日消息</small><strong id="statTodayMessages">–</strong></div>
+        <div class="stat-tile"><small>7 天消息</small><strong id="statWeekMessages">–</strong></div>
+        <div class="stat-tile"><small>7 天活跃用户</small><strong id="statWeekUsers">–</strong></div>
+        <div class="stat-tile"><small>待分类</small><strong id="statPendingClassify">–</strong></div>
+        <div class="stat-tile"><small>待确认事件</small><strong id="statPendingConfirm">–</strong></div>
+        <div class="stat-tile"><small>活跃需求</small><strong id="statActiveDemands">–</strong></div>
+        <div class="stat-tile risk-stat">
+          <small>7 天风险事件</small>
+          <strong><span class="risk-l1">一 <b id="statRisk1">0</b></span><span class="risk-l2">二 <b id="statRisk2">0</b></span><span class="risk-l3">三 <b id="statRisk3">0</b></span></strong>
+        </div>
+      </section>
+
+      <nav class="panel-tabs" id="panelTabs">
+        <button data-tab="risk" class="active">风险告警</button>
+        <button data-tab="events">事件</button>
+        <button data-tab="demands">需求</button>
+        <button data-tab="reports">报表</button>
+        <button data-tab="messages">消息流</button>
+      </nav>
+
+      <section class="tab-page active" id="tab-risk">
+        <div class="filter-row">
+          <label class="limit-control">等级
+            <select id="riskLevelFilter">
+              <option value="">全部</option>
+              <option value="3">三级·高风险</option>
+              <option value="2">二级·警告</option>
+              <option value="1">一级·提醒</option>
+            </select>
+          </label>
+          <label class="limit-control">状态
+            <select id="riskStatusFilter">
+              <option value="">全部</option>
+              <option value="pending">待确认</option>
+              <option value="confirmed">已确认</option>
+              <option value="rejected">已驳回</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" id="riskRefresh">刷新</button>
+        </div>
+        <div id="riskList" class="event-list"></div>
+      </section>
+
+      <section class="tab-page" id="tab-events">
+        <div class="filter-row">
+          <label class="limit-control">类型
+            <select id="eventTypeFilter">
+              <option value="">全部类型</option>
+              <option value="risk">风险</option>
+              <option value="feedback">功能反馈</option>
+              <option value="demand">新需求</option>
+              <option value="style">曲风</option>
+              <option value="release_issue">发行问题</option>
+              <option value="release_intel">发行资讯</option>
+              <option value="question">疑问</option>
+              <option value="sentiment">情绪</option>
+            </select>
+          </label>
+          <label class="limit-control">状态
+            <select id="eventStatusFilter">
+              <option value="">全部</option>
+              <option value="pending">待确认</option>
+              <option value="confirmed">已确认</option>
+              <option value="rejected">已驳回</option>
+            </select>
+          </label>
+          <button type="button" class="secondary" id="eventsRefresh">刷新</button>
+        </div>
+        <div id="eventList" class="event-list"></div>
+      </section>
+
+      <section class="tab-page" id="tab-demands">
+        <div class="filter-row">
+          <span class="muted">需求改名即与同名需求合并；「有趣」标记进入周报「小众但有趣」板块。</span>
+          <span class="flex-spacer"></span>
+          <button type="button" class="secondary" id="demandsRefresh">刷新</button>
+        </div>
+        <div id="demandList" class="event-list"></div>
+      </section>
+
+      <section class="tab-page" id="tab-reports">
+        <div class="filter-row">
+          <label class="limit-control">类型
+            <select id="reportTypeSelect">
+              <option value="daily">日报</option>
+              <option value="weekly">周报</option>
+            </select>
+          </label>
+          <label class="limit-control">日期
+            <input type="date" id="reportDate" />
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="reportPush" />
+            推送企业微信
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" id="reportForce" />
+            强制重生成
+          </label>
+          <span class="flex-spacer"></span>
+          <button type="button" id="runReport">立即生成</button>
+          <button type="button" class="secondary" id="reportsRefresh">刷新</button>
+        </div>
+        <p class="muted report-hint">生成需调用大模型，约 30 秒～2 分钟，请耐心等待。</p>
+        <div id="reportList" class="event-list"></div>
+      </section>
+
+      <section class="tab-page" id="tab-messages">
+        <div class="filter-row">
+          <label class="limit-control">类型
+            <select id="messageFilter">
+              <option value="">全部消息</option>
+              <option value="classified=0">未分类</option>
+              <option value="classified=1">已分类</option>
+              <option value="classified=2">分类失败</option>
+              <option value="noise=1">噪音</option>
+            </select>
+          </label>
+          <span class="muted" id="classifyStatus">–</span>
+          <span class="flex-spacer"></span>
+          <button type="button" id="runClassify">立即分类</button>
+          <label class="checkbox">
+            <input type="checkbox" id="retryFailed" />
+            含失败重试
+          </label>
+          <button type="button" class="secondary" id="messagesRefresh">刷新</button>
+        </div>
+        <div id="messageList" class="event-list"></div>
+      </section>
+    </main>
+
+    <script src="/public/markdown.js"></script>
+    <script src="/public/panel.js"></script>
+  </body>
+</html>
