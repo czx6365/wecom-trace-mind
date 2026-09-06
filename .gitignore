@@ -1,0 +1,27 @@
+# Local configuration
+.env
+
+# Runtime state
+feedback.db
+feedback.db-*
+feedback.db.*
+*.db-shm
+*.db-wal
+.runtime.json
+.server.pid
+.server.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local exports / operational data
+data/
+exports/
