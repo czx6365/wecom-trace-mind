@@ -12,19 +12,19 @@ The central design goal is not simply to summarize chat. It is to make every dow
 
 ### 1. AI Summary & Operations Workspace
 
-![AI summary and operations workspace](AI总结.jpg)
+![AI summary and operations workspace](AI总结.png)
 
 The main workspace combines **multi-group selection, collection controls, AI summaries, historical summaries, and weekly operations reports**. Summaries are generated over an explicitly selected message scope so operators can review what data was included before downstream actions are taken.
 
 ### 2. Evidence-Traceable AI QA
 
-![Evidence-traceable AI QA](AI回溯.jpg)
+![Evidence-traceable AI QA](AI回溯.png)
 
 The QA interface answers over raw messages, structured events, demand records, summaries, and reports while exposing the provenance behind the answer. It can surface the **group, group identifier, sender, timestamp, original message, and evidence ID**, allowing a generated conclusion to be checked against the underlying conversation rather than treated as an opaque answer.
 
 ### 3. Deep Analysis Dashboard
 
-![Deep analysis dashboard](深度分析.jpg)
+![Deep analysis dashboard](深度分析.png)
 
 The analysis dashboard separates **risk alerts, structured events, demand signals, reports, and the raw message stream** into reviewable views. Risk predictions remain human-confirmable or rejectable, and higher-risk items can be routed through a WeCom robot without making the model prediction itself the final operational decision.
 
