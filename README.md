@@ -8,19 +8,25 @@ The central design goal is not simply to summarize chat. It is to make every dow
 
 > Current public release: downstream analytics, structured classification, reporting, risk handling, and traceable QA. Production WeCom collection should be connected through an authorized official or enterprise-approved ingestion path.
 
-## Screenshots
+## Product Walkthrough
 
-### Operations workspace
+### 1. AI Summary & Operations Workspace
 
-![Operations workspace](docs/images/dashboard-overview.jpg)
+![AI summary and operations workspace](docs/images/ai-summary.jpg)
 
-The main workspace combines group selection, AI summaries, historical summaries, weekly operations reports, and evidence-grounded QA.
+The main workspace combines **multi-group selection, collection controls, AI summaries, historical summaries, and weekly operations reports**. Summaries are generated over an explicitly selected message scope so operators can review what data was included before downstream actions are taken.
 
-### Deep analysis panel
+### 2. Evidence-Traceable AI QA
 
-![Deep analysis panel](docs/images/analysis-panel.jpg)
+![Evidence-traceable AI QA](docs/images/traceable-qa.jpg)
 
-The analysis panel exposes operational metrics together with human-reviewable risk events, structured events, demand signals, reports, and the underlying message stream.
+The QA interface answers over raw messages, structured events, demand records, summaries, and reports while exposing the provenance behind the answer. It can surface the **group, group identifier, sender, timestamp, original message, and evidence ID**, allowing a generated conclusion to be checked against the underlying conversation rather than treated as an opaque answer.
+
+### 3. Deep Analysis Dashboard
+
+![Deep analysis dashboard](docs/images/deep-analysis.jpg)
+
+The analysis dashboard separates **risk alerts, structured events, demand signals, reports, and the raw message stream** into reviewable views. Risk predictions remain human-confirmable or rejectable, and higher-risk items can be routed through a WeCom robot without making the model prediction itself the final operational decision.
 
 ## Why this project
 
@@ -183,7 +189,10 @@ The core server uses the Python standard library, SQLite, and vanilla JavaScript
 ├── docs/
 │   ├── evidence-tracing.md    # retrieval / provenance design notes
 │   ├── roadmap.md             # development notes and planned extensions
-│   └── images/                # README screenshots
+│   └── images/
+│       ├── ai-summary.jpg
+│       ├── traceable-qa.jpg
+│       └── deep-analysis.jpg
 ├── .env.example
 ├── .gitignore
 ├── start.sh
