@@ -1,189 +1,302 @@
-# Muse AI — AI 社群客服与用户洞察系统
+# WeCom TraceMind
 
-把企业微信社群的海量聊天，自动变成**可监控的风险、可查询的需求、可溯源的知识**。
+### Traceable community intelligence for customer operations
 
-从消息采集、消息级结构化分析、风险实时告警，到日报/周报自动生成和可溯源的 AI 问答，一条消息进入系统后被拆解、关联、沉淀，最终每一句 AI 回答都能追回到「哪个群、哪个人、哪条原文」。
+**WeCom TraceMind** is a local-first AI operations system that turns community conversations into **structured events, risk alerts, demand signals, periodic reports, and evidence-grounded answers**.
 
-- **纯 Python 标准库 + 原生 JS + SQLite**，零第三方依赖，单机即可运行
-- 大模型侧对接任意 **OpenAI 兼容 `chat/completions` 接口**（配置一次即可）
+The central design goal is not simply to summarize chat. It is to make every downstream conclusion **auditable**: quantitative claims come from deterministic SQL aggregation, while generated answers and reports are constrained by retrieved evidence that can be traced back to the original group, sender, timestamp, and message.
 
-## 核心亮点
+> Current public release: downstream analytics, structured classification, reporting, risk handling, and traceable QA. Production WeCom collection should be connected through an authorized official or enterprise-approved ingestion path.
 
-| 能力 | 说明 |
-|---|---|
-| 🔍 **可溯源 AI 问答 agent** | 多表检索 + 图扩展 + 证据链，每条回答附证据 id，可追到群/人/时间/原文 |
-| 🧩 **消息级结构化分析** | 一条消息自动拆成 8 类结构化事件（风险/反馈/需求/曲风/发行/疑问/情绪…） |
-| 🚨 **三级风险实时告警** | 二/三级风险自动推送企业微信群机器人，去重防重复打扰 |
-| 📊 **日报/周报自动化** | 数字全部 SQL 聚合、LLM 只写措辞不报数，定时生成、可选自动推送 |
-| 🪶 **零依赖单机部署** | 标准库 HTTP 服务 + SQLite，`./start.sh` 一键后台运行（macOS 由 launchd 托管） |
+## Screenshots
 
-## 系统架构
+### Operations workspace
+
+![Operations workspace](docs/images/dashboard-overview.jpg)
+
+The main workspace combines group selection, AI summaries, historical summaries, weekly operations reports, and evidence-grounded QA.
+
+### Deep analysis panel
+
+![Deep analysis panel](docs/images/analysis-panel.jpg)
+
+The analysis panel exposes operational metrics together with human-reviewable risk events, structured events, demand signals, reports, and the underlying message stream.
+
+## Why this project
+
+Operational community chat is noisy and difficult to use directly. A useful system needs to answer three different questions at once:
+
+1. **What happened?** — identify risks, product feedback, demands, release issues, questions, style preferences, and sentiment at message level.
+2. **What is changing?** — aggregate stable counts and trends without asking an LLM to invent or recalculate numbers.
+3. **Where did this conclusion come from?** — preserve provenance so summaries and answers can be traced to the original evidence.
+
+This leads to a hybrid design in which **LLMs interpret language, SQL computes facts, and the retrieval layer preserves evidence provenance**.
+
+## System architecture
 
 ```text
-企业微信社群
-   │  本地导出 / 自动采集（PoC，见下文）
-   ▼
-SQLite（本地库：消息 / 事件 / 需求 / 总结 / 报告）
-   │
-   ├─ 噪音过滤 + 官方账号过滤
-   │
-   ├─ 消息级分类管线（批量 LLM 分类，8 类结构化事件）
-   │      ├─ 风险事件 ──► 二/三级风险 ──► 企业微信群机器人告警
-   │      └─ 需求事件 ──► 需求注册表（同义需求归一化、追溯首现时间）
-   │
-   ├─ AI 总结（按群/按批次，可选推送企业微信）
-   │
-   ├─ 日报 / 周报（SQL 聚合数字 → LLM 写措辞，定时自动生成）
-   │
-   └─ 首页 AI 问答 agent
-          └─ 多表子串检索 → 图扩展（需求→事件→消息 / 邻近消息）→ 证据链 → SSE 流式回答
+Community messages
+      │
+      ▼
+SQLite message store
+      │
+      ├── Noise filtering
+      │
+      ├── Message-level LLM classification
+      │      ├── risk
+      │      ├── feedback
+      │      ├── demand
+      │      ├── style
+      │      ├── release_issue / release_intel
+      │      ├── question
+      │      └── sentiment
+      │
+      ├── Demand registry + human confirmation
+      │
+      ├── Risk routing + WeCom webhook
+      │
+      ├── SQL aggregation
+      │      └── deterministic counts / trends / rankings
+      │
+      ├── Daily / weekly report generation
+      │      └── LLM writes wording from precomputed statistics
+      │
+      └── Traceable QA agent
+             ├── multi-table lexical retrieval
+             ├── demand → event → message expansion
+             ├── nearby-message expansion
+             ├── evidence quota / truncation
+             └── SSE streaming answer with evidence IDs
 ```
 
-Web UI（纯原生 JS，无框架）：
+## Core engineering ideas
 
-- **首页**：AI 总结、AI 问答、历史总结（按日期筛选）、每周运营报告
-- **深度分析面板**：风险、事件、需求、报表、消息流五个视角
+### 1. Traceable QA instead of opaque RAG
 
-## 快速开始
+The QA layer searches across five evidence sources:
+
+```text
+messages + events + demands + summaries + reports
+```
+
+The retrieval pipeline is deliberately inspectable:
+
+```text
+question
+  → Chinese substring candidates
+  → multi-table retrieval
+  → evidence scoring
+  → graph-like expansion
+  → quota-based evidence packing
+  → LLM answer
+  → evidence IDs
+```
+
+A direct message match is not always enough. Reports and summaries may paraphrase the source conversation, so the system can expand through relationships such as:
+
+```text
+demand → event → original message
+```
+
+It also adds nearby messages from the same group to recover local conversational context. The final prompt is bounded by per-type quotas and a global character budget rather than blindly passing every match to the model.
+
+See [`docs/evidence-tracing.md`](docs/evidence-tracing.md) for the retrieval design.
+
+### 2. Structured message understanding
+
+The classification pipeline converts raw messages into normalized operational events. It includes:
+
+- an 8-type event schema;
+- demand-name normalization against an existing demand registry;
+- low-temperature structured generation;
+- tolerant JSON parsing;
+- batch splitting after retriable model/API failures;
+- idempotent event reconstruction;
+- human confirmation/rejection state;
+- risk delivery state persisted separately from classification state.
+
+This separates **raw conversation** from a more stable operational representation that can be aggregated and reviewed.
+
+### 3. LLMs do not calculate report numbers
+
+A key reliability rule in this project is:
+
+> **SQL computes numbers; the LLM only turns those numbers into readable operational language.**
+
+The aggregation layer computes message volume, active users, risk counts, feedback rankings, demand frequency, trend comparisons, and sentiment statistics before report generation. The report prompt explicitly forbids modifying, estimating, or inventing missing values.
+
+This makes the numeric part of daily and weekly reports reproducible independently of the language model.
+
+### 4. Human-in-the-loop risk handling
+
+Risk events are classified into three levels. Higher-risk events can be pushed to a configured WeCom robot while remaining reviewable in the dashboard.
+
+The system keeps separate state for:
+
+- model classification;
+- human confirmation/rejection;
+- webhook delivery;
+- re-push operations.
+
+This avoids treating a model prediction as a final operational decision.
+
+### 5. Local-first, dependency-light architecture
+
+The core server uses the Python standard library, SQLite, and vanilla JavaScript. This keeps the prototype easy to inspect and deploy while leaving clear boundaries for later replacement with a production web framework, search engine, or vector store.
+
+## Deterministic vs. generative responsibilities
+
+| Component | Deterministic / auditable | LLM-assisted |
+| --- | --- | --- |
+| Message storage | SQLite schema, IDs, timestamps | — |
+| Noise handling | rule-based filtering | — |
+| Event extraction | schema validation, persistence, retry state | semantic classification |
+| Risk workflow | state transitions, webhook routing | risk/event interpretation |
+| Metrics | SQL aggregation | — |
+| Daily / weekly reports | fixed statistics payload | wording and interpretation |
+| QA retrieval | lexical search, relationship expansion, quotas | final grounded answer |
+| Provenance | evidence IDs + source metadata | citation-aware response wording |
+
+## Repository structure
+
+```text
+.
+├── app.py                     # HTTP API, SSE endpoints and schedulers
+├── lib/
+│   ├── classifier.py          # structured message classification
+│   ├── chat.py                # retrieval, evidence expansion and QA prompts
+│   ├── db.py                  # SQLite schema, environment and runtime paths
+│   ├── llm.py                 # OpenAI-compatible model client
+│   ├── noise.py               # message noise rules
+│   ├── reports.py             # daily / weekly report generation
+│   ├── stats.py               # deterministic SQL aggregation
+│   └── wecom.py               # WeCom robot delivery and risk alerts
+├── public/
+│   ├── index.html             # operations workspace
+│   ├── panel.html             # deep analysis dashboard
+│   ├── app.js / panel.js      # browser logic
+│   ├── markdown.js            # lightweight markdown rendering
+│   └── styles.css             # UI styling
+├── scripts/
+│   ├── classify_once.py       # one-shot classification CLI
+│   └── run_report.py          # report-generation CLI
+├── docs/
+│   ├── evidence-tracing.md    # retrieval / provenance design notes
+│   ├── roadmap.md             # development notes and planned extensions
+│   └── images/                # README screenshots
+├── .env.example
+├── .gitignore
+├── start.sh
+├── stop.sh
+└── restart.sh
+```
+
+## Quick start
+
+The project intentionally has no third-party Python runtime dependency for the core server.
 
 ```bash
-# 1. 生成配置模板
 cp .env.example .env
+```
 
-# 2. 编辑 .env，填写大模型接口（OpenAI 兼容格式）
-#    MODEL_API_URL=https://api.openai.com/v1/chat/completions
-#    MODEL_API_KEY=你的key
-#    MODEL_NAME=gpt-4o-mini
+Configure at least:
 
-# 3. 启动（后台运行并自动打开浏览器）
+```bash
+MODEL_API_URL=https://api.openai.com/v1/chat/completions
+MODEL_API_KEY=...
+MODEL_NAME=gpt-4o-mini
+```
+
+Then start the local service:
+
+```bash
 ./start.sh
-
-# 浏览器打开 http://127.0.0.1:8787
 ```
 
-其他命令：
+or directly:
 
 ```bash
-./stop.sh      # 停止服务
-./restart.sh   # 重启服务
+python3 app.py
 ```
 
-> 等价手动命令：`python3 app.py`；日志见 `.server.log`。
+The server opens on `http://127.0.0.1:8787` by default and automatically tries the next few ports if that port is occupied.
 
-## 核心创新详解
-
-### 1. 可溯源 AI 问答 agent（首页「AI 问答」）
-
-知识库 = 原始群消息 + 结构化事件 + 需求 + AI 总结 + 运营报告，五张表同时检索。完整设计见 [证据溯源.md](证据溯源.md)，关键链路：
-
-```
-提问 → 候选词切分 → 五表 LIKE 检索+评分 → 图扩展 → 配额截断 → 证据 JSON → LLM 流式回答
-```
-
-- **候选词切分**：按标点切句，生成整句 + 3~8 字滑窗候选（过滤停用词/纯标点）。3 字起步——2 字词（如「写歌」）在中文里噪音过大。
-- **图扩展（核心）**：报告/总结是 LLM 转述，措辞与原文常有差异（提问说「骑车」、原文写「踩车」）。直接查消息表会漏，因此沿 **需求 → 事件 → 消息** 关联链扩展还原原始出处；同时把直接命中消息**同群 ±3 分钟**的邻近消息、**同批次注册的需求**（同一段对话）一并带出。
-- **配额截断**：证据按类型配额（消息 25 / 事件 12 / 需求 8 / 报告 5 / 总结 5），防止高频词命中挤掉溯源所需的报告/需求，总量上限 60 条 / 12000 字。
-- **回答硬规则**：只依据证据、不得编造；溯源逐条引用群名/群编号/发送人/时间/原文并附证据 id（如 `msg#173`）；相似消息必须全部列出；提问措辞与原文不一致时必须点明转述来源（如 `report#2`）。
-- **SSE 流式输出**，支持多轮追问；证据不足时明确告知检索了哪些来源。
-
-**为什么不用向量检索**：当前数据量下（数千条消息/事件），SQLite 全表 LIKE 是毫秒级；n-gram 子串匹配对中文短词和错别字更稳健，且零依赖、可解释。规模上来后替换 FTS5 / 向量库即可，检索层接口不变。
-
-### 2. 消息级结构化分析管线
-
-批量调用 LLM 把每条消息拆成结构化事件（温度 0.1，宁缺毋滥）：
-
-| 事件类型 | 内容 |
-|---|---|
-| `risk` | 三级风险：一级提醒 / 二级明显违规 / 三级严重（人身攻击、色情违法、赌博诈骗、恶意广告等 8 类） |
-| `feedback` | 已有功能问题（功能名 + 问题描述） |
-| `demand` | 新需求（自动注册进需求表，同义需求归一化到同一名字，追溯 first_seen） |
-| `style` | 曲风偏好（古风/DJ/说唱/戏曲等 12 类） |
-| `release_issue` / `release_intel` | 发行问题 / 用户带来的平台新规则情报 |
-| `question` | 产品使用疑问 |
-| `sentiment` | 情绪（每条消息必出，负面必附原因） |
-
-工程细节：
-
-- **需求注册表注入**：分类 prompt 注入现有需求表，保证同义需求（「工程导出」vs「导出分轨」）归一到同一名字，`is_new` 才注册新需求。
-- **批次拆半重试**：超时/网络/5xx 时整批拆半重发，小批失败标记 `classified=2` 可手动重跑。
-- **JSON 容错解析**：剥 markdown 围栏 → 尾部截断修复（≤5 次）→ 逐条字段校验，非法字段静默丢弃。
-- **幂等**：事件先删后插，重跑不产生重复数据。
-
-### 3. 三级风险实时告警
-
-- 分类出 `risk` 事件后，**二/三级自动推送**企业微信群机器人（`RISK_WEBHOOK_URL`，不填则回落到总结推送 Webhook）。
-- 推送状态落库、按消息去重（事件重建不丢推送记录），已推送/待人工确认在报告里明示。
-- 官方账号消息（名称含「小助手」「官方」等）不进风险判定，避免误报。
-
-### 4. 日报 / 周报：「LLM 不报数」
-
-**所有数字由 SQL 聚合层计算，LLM 只拿数字写措辞，禁止编造、修改、估算**——数字里没有的写「无」。
-
-- **日报**：风险事件（附群/发送者/内容、标注推送状态）、异常爆发问题、当日新需求、负面情绪来源、一句话概览。
-- **周报**：功能反馈 TOP、新需求 TOP（含 7 天/30 天计数与环比增速）、曲风趋势环比、情绪分布、小众有趣需求、下周验证建议 Top 3。
-- 按配置时间**定时自动生成**（`REPORT_DAILY_HOUR`，周一顺带补周报），可选自动推送企业微信。
-- 幂等：`UNIQUE(report_type, period_start)` 占位防并发，生成失败自动清理可重试；页面支持按日期区间筛选历史报告。
-
-## 目录结构
-
-```text
-app.py                     # 标准库 HTTP 服务：路由、SSE、调度器（采集/分类/报表）
-lib/
-  classifier.py            # 消息级结构化分类管线（8 类事件、需求注册、风险推送）
-  chat.py                  # 问答 agent 检索层：多表检索 + 图扩展 + 证据序列化
-  reports.py               # 日报/周报生成（周期计算、幂等占位、LLM 措辞）
-  stats.py                 # SQL 聚合层：报表/面板所有数字在此计算
-  db.py                    # SQLite 存取与 schema
-  llm.py                   # OpenAI 兼容接口调用（含流式）
-  noise.py                 # 噪音消息过滤
-  wecom.py                 # 企业微信群机器人推送（markdown / 风险告警）
-public/                    # 原生 JS 前端（首页 + 深度分析面板，SSE 流式渲染）
-scripts/
-  import_wecom_export.py   # 企业微信导出 JSON 导入（过滤/去重/入库）
-  wecom_auto_import.py     # 自动采集链路（定时）
-  classify_once.py         # 命令行一次性分类
-  run_report.py            # 命令行生成日报/周报
-  backfill_messages.py     # 历史数据回填
-start.sh / stop.sh / restart.sh   # 一键启停（macOS launchd 托管）
-证据溯源.md                # 问答 agent 检索与图扩展设计文档
-```
-
-## 企业微信采集 PoC（合规提示）
-
-正式链路建议走企业微信**会话内容存档**官方接口。仓库内提供一条本地导出 PoC 链路，仅限公司明确授权的测试机验证：
-
-```text
-企业微信 Mac 客户端保持登录
-→ 外部工具导出测试群 JSON
-→ scripts/import_wecom_export.py 导入 feedback.db
-```
+### Useful CLI commands
 
 ```bash
-# 导入一份已导出的 JSON
-python3 scripts/import_wecom_export.py /path/to/测试群_chat_records.json --source-group 测试群
+# Classify pending messages
+python3 scripts/classify_once.py --days 7
+
+# Generate a daily report
+python3 scripts/run_report.py --type daily --date 2026-09-01
+
+# Generate a weekly report
+python3 scripts/run_report.py --type weekly --date 2026-09-01
 ```
 
-> ⚠️ 本地解密企业微信数据库不是官方生产接口，仅建议在授权测试机上做 PoC。**正式上线务必切换企业微信会话存档。**
+## Configuration
 
-## 关键配置（.env）
+| Variable | Purpose |
+| --- | --- |
+| `MODEL_API_URL` | OpenAI-compatible `chat/completions` endpoint |
+| `MODEL_API_KEY` | model API credential |
+| `MODEL_NAME` | model identifier |
+| `MODEL_TIMEOUT_SECONDS` | request timeout |
+| `MODEL_MAX_TOKENS` | generation limit |
+| `PORT` | local web-server port |
+| `WECHAT_WEBHOOK_URL` | summary/report WeCom robot webhook |
+| `RISK_WEBHOOK_URL` | dedicated risk-alert webhook |
+| `CLASSIFY_DAYS` | default classification look-back window |
+| `SUMMARY_INTERVAL_MINUTES` | optional collection/summarization interval |
+| `REPORT_DAILY_HOUR` | scheduled daily-report hour |
+| `AUTO_PUSH_DAILY` / `AUTO_PUSH_WEEKLY` | optional automatic report delivery |
+| `IGNORE_SENDERS` | sender names/keys to exclude from analysis |
 
-| 变量 | 说明 |
-|---|---|
-| `MODEL_API_URL` / `MODEL_API_KEY` / `MODEL_NAME` | 大模型接口（OpenAI 兼容 chat/completions） |
-| `MODEL_TIMEOUT_SECONDS` / `MODEL_MAX_TOKENS` | 超时与输出上限。推理模型建议配合 `thinking:disabled`，避免思考 token 耗光超时 |
-| `WECHAT_WEBHOOK_URL` | 企业微信群机器人（AI 总结/日报周报推送） |
-| `RISK_WEBHOOK_URL` | 风险告警专用 Webhook（二/三级风险），不填回落到上面 |
-| `REPORT_DAILY_HOUR` | 日报自动生成时间（周一顺带补周报） |
-| `AUTO_PUSH_DAILY` / `AUTO_PUSH_WEEKLY` | 报告生成后是否自动推送企业微信 |
-| `SUMMARY_INTERVAL_MINUTES` | 自动采集+总结的默认间隔（网页可改，重启不丢） |
-| `IGNORE_SENDERS` | 过滤的发送者（官方账号/机器人，逗号分隔） |
-| `WECOM_*` | 本地导出 PoC 链路配置（见上节） |
+The `WECOM_*` variables in `.env.example` are reserved for an **authorized local collection adapter**. The public repository does not ship a production WeCom data-extraction implementation.
 
-本地数据全部保存在 `feedback.db`（已 gitignore，含客户聊天记录，不入库）。
+## Data model
 
-## 技术选型说明
+The main tables are intentionally separated by semantic responsibility:
 
-- **Web 服务**：Python `http.server`（ThreadingHTTPServer），SSE 用流式响应实现，无框架依赖。
-- **前端**：原生 JS + CSS，自写 markdown 渲染，无构建步骤。
-- **存储**：SQLite（WAL 模式），schema 见 `lib/db.py`。
-- **大模型**：全部调用收敛在 `lib/llm.py`，换接口只改一处。
+```text
+messages
+   │
+   ├── events
+   │      └── demands
+   │
+   ├── summaries
+   ├── reports
+   └── chat_messages
+```
+
+`messages` remain the primary source of truth. Derived tables store structured or generated views while retaining message IDs and timestamps needed for provenance.
+
+## Reproducibility and evaluation
+
+The public repository currently exposes the implementation and deterministic data-processing rules, but it does **not** contain a sanitized benchmark dataset or a verified end-to-end accuracy result. No classification or QA quality number is claimed here without a reproducible artifact.
+
+Useful evaluation directions for a sanitized test set include:
+
+- event extraction precision / recall by event type;
+- risk-level precision and false-alert rate;
+- demand normalization consistency;
+- evidence retrieval Recall@K;
+- answer citation correctness / groundedness;
+- report numeric consistency;
+- latency and model-call cost.
+
+A lightweight GitHub Actions workflow performs Python syntax checks on the public source tree.
+
+## Data and privacy
+
+Runtime SQLite databases, WAL files, local exports, `.env`, logs, and other operational artifacts are excluded through `.gitignore`.
+
+This repository is intended to contain **system code and design evidence, not customer conversation data or credentials**. If a historical commit ever contained real operational data, removing it from the current tree does not erase that historical Git object; repository history should be rewritten separately before treating the repository as fully sanitized.
+
+## Design scope
+
+This is a compact research/engineering prototype rather than a production customer-support platform. Its strongest focus is the boundary between **language understanding, deterministic analytics, provenance, and human review**.
+
+The most important design principle is simple:
+
+> A useful AI operations system should not only produce an answer — it should preserve enough evidence to explain where that answer came from.
